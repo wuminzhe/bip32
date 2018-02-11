@@ -1,6 +1,12 @@
 # Bip32
 
-**TODO: Add description**
+Another Bip32 implement for elixir lang. 
+
+less code, easy to read.
+
+# How to use
+
+See tests.
 
 ## Installation
 
