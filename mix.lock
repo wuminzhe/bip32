@@ -1,0 +1,3 @@
+%{"base58": {:hex, :base58, "0.1.0", "ab34d1a4ef0f11ac61b9f5ad54c35826c3bdc541688a2f95183417272aa1fcfc", [], [], "hexpm"},
+  "cryptex": {:hex, :cryptex, "0.0.1", "efe321bb4537916aed78c25336ca7da5617e4595df7d03ac537b7f2f08856401", [], [], "hexpm"},
+  "libsecp256k1": {:git, "https://github.com/mbrix/libsecp256k1.git", "671be513a6c19db47fbeea0ceefbf61421d196cc", []}}
