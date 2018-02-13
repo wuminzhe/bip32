@@ -47,12 +47,12 @@ defmodule Bip32.Node do
 
   def from_bip32(bip32) do
     decoded = "0" <> (Base58.decode(bip32) |> Integer.to_string(16))
-    checksum = String.slice(decoded, -8..-1)
+    # checksum = String.slice(decoded, -8..-1)
     bip32 = String.slice(decoded, 0..-9) |> String.downcase
 
-    version = String.slice(bip32, 0..7)
+    # version = String.slice(bip32, 0..7)
     depth = String.slice(bip32, 8..9)
-    parent_key_fingerprint = String.slice(bip32, 10..17)
+    # parent_key_fingerprint = String.slice(bip32, 10..17)
     child_number = String.slice(bip32, 18..25)
     chain_code = String.slice(bip32, 26..89)
     key = String.slice(bip32, 90..-1)
@@ -82,13 +82,13 @@ defmodule Bip32.Node do
 
   defp p_build_one_way_hash(private_key_hex, public_key_pub, chain_code_hex, i \\ 0)
   # hardened
-  defp p_build_one_way_hash(nil, public_key_pub, chain_code_hex, i) when i >= 0x80000000, do: raise "private key missing!"
-  defp p_build_one_way_hash(private_key_hex, public_key_pub, chain_code_hex, i) when i >= 0x80000000 do
+  defp p_build_one_way_hash(nil, _, _, i) when i >= 0x80000000, do: raise "private key missing!"
+  defp p_build_one_way_hash(private_key_hex, _, chain_code_hex, i) when i >= 0x80000000 do
     message = <<0>> <> Bip32.Utils.pack_h(private_key_hex) <> Bip32.Utils.i_as_bytes(i)
     Bip32.Utils.pack_h(chain_code_hex) |> Bip32.Utils.hmac_sha512(message)
   end
   # normal
-  defp p_build_one_way_hash(private_key_hex, public_key_pub, chain_code_hex, i) when i >= 0 and i < 0x80000000 do
+  defp p_build_one_way_hash(_, public_key_pub, chain_code_hex, i) when i >= 0 and i < 0x80000000 do
     message = Bip32.Utils.pack_h(public_key_pub) <> Bip32.Utils.i_as_bytes(i)
     Bip32.Utils.pack_h(chain_code_hex) |> Bip32.Utils.hmac_sha512(message)
   end
