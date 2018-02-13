@@ -1,6 +1,6 @@
 # Bip32
 
-Another Bip32 implement for elixir lang. 
+Another Bip32 implement but in elixir lang. 
 
 less code, easy to read.
 
