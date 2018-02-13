@@ -33,9 +33,9 @@ defmodule Bip32.Node do
     xprv =
       case node.private_key do
         nil -> nil
-        _ -> serialize(version_prv, depth, parent_key_fingerprint, child_number, node.chain_code, "00#{node.private_key}")
+        _ -> p_serialize(version_prv, depth, parent_key_fingerprint, child_number, node.chain_code, "00#{node.private_key}")
       end
-    xpub = serialize(version_pub, depth, parent_key_fingerprint, child_number, node.chain_code, node.public_key)
+    xpub = p_serialize(version_pub, depth, parent_key_fingerprint, child_number, node.chain_code, node.public_key)
 
     if xprv == nil do
       %{xpub: Bip32.Utils.checksum_base58(xpub)}
@@ -74,23 +74,29 @@ defmodule Bip32.Node do
     }
   end
 
-  defp serialize(version, depth, parent_key_fingerprint, child_number, chain_code, key_hex) do
+  defp p_serialize(version, depth, parent_key_fingerprint, child_number, chain_code, key_hex) do
     version <> depth <> parent_key_fingerprint <> child_number <> chain_code <> key_hex
   end
 
   @order String.to_integer("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
 
-  # https://bitcoin.org/img/dev/en-hd-private-parent-to-private-child.svg
-  def derive_child(node, i \\ 0) do
-    # generate the "one way hash"
-    if i >= 0x80000000 do # hardened. it impossible to create child public keys without knowing the parent private key
-      message = <<0>> <> Bip32.Utils.pack_h(node.private_key) <> Bip32.Utils.i_as_bytes(i)
-      one_way_hash = Bip32.Utils.pack_h(node.chain_code) |> Bip32.Utils.hmac_sha512(message)
-    else # normal.
-      message = Bip32.Utils.pack_h(node.public_key) <> Bip32.Utils.i_as_bytes(i)
-      one_way_hash = Bip32.Utils.pack_h(node.chain_code) |> Bip32.Utils.hmac_sha512(message)
-    end
+  defp p_build_one_way_hash(private_key_hex, public_key_pub, chain_code_hex, i \\ 0)
+  # hardened
+  defp p_build_one_way_hash(nil, public_key_pub, chain_code_hex, i) when i >= 0x80000000, do: raise "private key missing!"
+  defp p_build_one_way_hash(private_key_hex, public_key_pub, chain_code_hex, i) when i >= 0x80000000 do
+    message = <<0>> <> Bip32.Utils.pack_h(private_key_hex) <> Bip32.Utils.i_as_bytes(i)
+    Bip32.Utils.pack_h(chain_code_hex) |> Bip32.Utils.hmac_sha512(message)
+  end
+  # normal
+  defp p_build_one_way_hash(private_key_hex, public_key_pub, chain_code_hex, i) when i >= 0 and i < 0x80000000 do
+    message = Bip32.Utils.pack_h(public_key_pub) <> Bip32.Utils.i_as_bytes(i)
+    Bip32.Utils.pack_h(chain_code_hex) |> Bip32.Utils.hmac_sha512(message)
+  end
 
+  # https://bitcoin.org/img/dev/en-hd-private-parent-to-private-child.svg
+  def derive_child(node, i \\ 0, only_public \\ false) do
+    one_way_hash = p_build_one_way_hash(node.private_key, node.public_key, node.chain_code, i)
+    
     # get the child private key
     left_int = one_way_hash |> String.slice(0..63) |> String.to_integer(16)
     child_private_key = rem (left_int + String.to_integer(node.private_key, 16)), @order
@@ -104,7 +110,7 @@ defmodule Bip32.Node do
     child_public_key_hex = Bip32.Utils.get_public_key_from_private_key(child_private_key_hex)
 
     %Bip32.Node{
-      private_key: child_private_key_hex, 
+      private_key: (if only_public, do: nil, else: child_private_key_hex),
       public_key: child_public_key_hex, 
       chain_code: child_chain_code_hex,
       depth: node.depth + 1,
@@ -113,7 +119,27 @@ defmodule Bip32.Node do
     }
   end
 
-  def path(node) do
+  defp p_derive(node, [head | tail], only_public \\ false) do
+    i = case String.ends_with?(head, "'") do
+      true -> 0x80000000 + (head |> String.slice(0..-2) |> String.to_integer)
+      false -> String.to_integer(head)
+    end
+
+    if length(tail) == 0 do
+      derive_child(node, i, only_public)
+    else
+      derive_child(node, i, false) |> p_derive(tail, only_public)
+    end
+  end
+
+  # 是否hardened由i决定；是否只是公钥派生，由m/M决定，而且只对最后一个节点有效
+  def derive_descendant_by_path(node, path) do
+    [head | tail] = String.split(path, "/")
+    
+    case head do
+      "m" -> p_derive(node, tail)
+      "M" -> p_derive(node, tail, true) # 只对最后一个节点有效
+    end
     
   end
 
